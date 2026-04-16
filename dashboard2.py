@@ -5,6 +5,12 @@ import plotly.graph_objects as go
 from plotly.subplots import make_subplots
 import numpy as np
 from datetime import datetime, timedelta
+import os                    # 👈 Agrega esta
+import requests             # 👈 Agrega esta
+from io import BytesIO      # 👈 Agrega esta
+from dotenv import load_dotenv  # 👈 Agrega esta
+
+load_dotenv()   
 
 # ============================================
 # CONFIGURACIÓN DE LA PÁGINA
@@ -50,27 +56,56 @@ distritos_nombres = {
 # ============================================
 # CARGAR DATOS
 # ============================================
-@st.cache_data
+@st.cache_data(ttl=3600)
 def cargar_datos():
-    ruta = r"D:\mi_carrera\SextoCiclo\Soluciones_I_Negocios\Crimes_1M_ETL\Crimes_Limpio.csv"
-    df = pd.read_csv(ruta)
-    df['Date'] = pd.to_datetime(df['Date'])
+    """Carga los datos desde Google Drive usando FILE_ID desde .env"""
     
-    # Agregar columna con nombre del distrito
-    df['District_Name'] = df['District'].map(distritos_nombres)
-    # Si algún distrito no tiene nombre, mantener el número
-    df['District_Name'] = df['District_Name'].fillna('Distrito ' + df['District'].astype(str))
+    # 🔐 Leer FILE_ID desde variable de entorno
+    file_id = os.getenv("GDRIVE_FILE_ID")
     
-    return df
+    if not file_id:
+        st.error("❌ Error: GDRIVE_FILE_ID no está configurado en el archivo .env")
+        st.info("Asegúrate de tener un archivo .env con: GDRIVE_FILE_ID=tu_id_aqui")
+        return pd.DataFrame()
+    
+    # Construir URL de descarga directa
+    url = f"https://drive.google.com/uc?export=download&id={file_id}"
+    
+    with st.spinner("📥 Cargando datos desde Google Drive..."):
+        try:
+            response = requests.get(url, timeout=60)
+            
+            if response.status_code != 200:
+                st.error(f"Error al descargar: {response.status_code}")
+                return pd.DataFrame()
+            
+            # Leer CSV
+            bytesio = BytesIO(response.content)
+            df = pd.read_csv(bytesio)
+            
+            # Procesar fechas
+            df['Date'] = pd.to_datetime(df['Date'])
+            
+            # Agregar nombre del distrito
+            df['District_Name'] = df['District'].map(distritos_nombres)
+            
+            return df
+            
+        except Exception as e:
+            st.error(f"Error al cargar datos: {e}")
+            return pd.DataFrame()
 
 # Título principal
 st.title("🚔 Dashboard de Análisis de Crímenes - Chicago")
 st.markdown("---")
-
 # Cargar datos
-with st.spinner("Cargando datos..."):
+with st.spinner("🔄 Procesando datos..."):
     df = cargar_datos()
 
+if df.empty:
+    st.stop()
+
+# Mostrar éxito
 st.success(f"✅ Datos cargados: {len(df):,} registros")
 
 # ============================================

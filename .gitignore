@@ -1,0 +1,5 @@
+# Crear archivo .gitignore
+echo ".env" > .gitignore
+echo ".streamlit/secrets.toml" >> .gitignore
+echo "__pycache__/" >> .gitignore
+echo "*.pyc" >> .gitignore
