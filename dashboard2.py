@@ -58,14 +58,44 @@ distritos_nombres = {
 # ============================================
 @st.cache_data(ttl=3600)
 def cargar_datos():
-    """Carga los datos desde Google Drive usando FILE_ID desde .env"""
+    """Carga los datos desde Google Drive usando FILE_ID desde secrets o .env"""
     
-    # 🔐 Leer FILE_ID desde variable de entorno
-    file_id = os.getenv("GDRIVE_FILE_ID")
+    # 🔐 Leer FILE_ID (prioridad: secrets > .env)
+    file_id = None
     
+    # 1. Intentar desde secrets de Streamlit (nube)
+    try:
+        file_id = st.secrets.get("GDRIVE_FILE_ID")
+        if file_id:
+            st.info("🔐 Usando configuración desde Streamlit Secrets")
+    except:
+        pass
+    
+    # 2. Si no está en secrets, intentar desde .env (local)
     if not file_id:
-        st.error("❌ Error: GDRIVE_FILE_ID no está configurado en el archivo .env")
-        st.info("Asegúrate de tener un archivo .env con: GDRIVE_FILE_ID=tu_id_aqui")
+        file_id = os.getenv("GDRIVE_FILE_ID")
+        if file_id:
+            st.info("📁 Usando configuración desde archivo .env")
+    
+    # 3. Si aún no hay ID, mostrar error
+    if not file_id:
+        st.error("❌ Error: GDRIVE_FILE_ID no está configurado")
+        st.info("""
+        **Configuración necesaria:**
+        
+        **En Streamlit Cloud (nube):**
+        1. Ve a Settings → Secrets
+        2. Agrega:
+        ```toml
+        GDRIVE_FILE_ID = "tu_id_aqui"
+        ```
+        
+        **En Local:**
+        Crea un archivo `.env` con:
+        ```
+        GDRIVE_FILE_ID=tu_id_aqui
+        ```
+        """)
         return pd.DataFrame()
     
     # Construir URL de descarga directa
